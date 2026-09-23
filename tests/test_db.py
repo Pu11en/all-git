@@ -77,3 +77,44 @@ def test_repo_meta_roundtrip(tmp_path: Path) -> None:
     after = repo.get_repo("antonmedv", "gitmal")
     assert after["stars"] == 12
     assert after["language"] == "Go"
+
+
+def test_straddling_chunk_credits_the_right_repo(tmp_path: Path) -> None:
+    """A caption chunk covering two repos must not give one the other's pitch."""
+    repo = make_repo(tmp_path)
+    repo.upsert_video(
+        {
+            "video_id": "straddle01",
+            "title": "Weekly #14",
+            "upload_date": "2026-08-08",
+            "webpage_url": "https://youtu.be/straddle01",
+        }
+    )
+    description = (
+        "03:51 - Printer https://github.com/acme/printer\n"
+        "04:16 - Ledger https://github.com/acme/ledger\n"
+    )
+    repo.set_video_description("straddle01", description)
+    for mention in parse_description(description):
+        repo_id = repo.upsert_repo(
+            mention["owner"], mention["name"], mention["url"], mention["display_name"], "straddle01"
+        )
+        repo.add_mention(repo_id, "straddle01", mention["timestamp_seconds"], mention["display_name"])
+    printer_pitch = "Printer turns a mailbox into a private print queue. " * 8
+    ledger_pitch = "Ledger brings invoicing and receipts into one workspace. " * 8
+    repo.replace_chunks(
+        "straddle01",
+        [
+            {
+                "chunk_index": 0,
+                "start_ms": 231_000,
+                "end_ms": 280_000,
+                "text": printer_pitch + ledger_pitch,
+            }
+        ],
+    )
+    repo.link_mention_excerpts("straddle01")
+
+    ledger = repo.get_repo("acme", "ledger")["mentions"][0]["excerpt"]
+    assert ledger.startswith("Ledger")
+    assert "print queue" not in ledger

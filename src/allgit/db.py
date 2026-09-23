@@ -90,6 +90,8 @@ def clean_tokens(query: str) -> list[str]:
 
 # Longest stretch of narration credited to a single repo mention.
 MENTION_WINDOW_MS = 120_000
+# Below this a caption chunk is awarded whole rather than split by time.
+MIN_SLICE_CHARS = 240
 
 class Repository:
     def __init__(self, db_path: Path) -> None:
@@ -249,10 +251,10 @@ class Repository:
 
         A video description lists every repo as `MM:SS - Name url`, so consecutive
         mention timestamps bound the narration about one repo. Caption chunks are
-        coarser than that and routinely straddle two repos, so a chunk that only
-        partly overlaps the window is sliced proportionally by time and the start
-        is snapped to where the host actually says the repo's name. Taking the
-        whole nearest chunk instead credits a repo with its neighbour's pitch.
+        coarser than that and routinely straddle two repos, so a chunk crossing a
+        boundary is split by time where it is long enough to split meaningfully,
+        and otherwise awarded whole to the mention it overlaps most. Taking the
+        single nearest chunk instead credits a repo with its neighbour's pitch.
         """
         with self.transaction() as conn:
             mentions = [
@@ -273,22 +275,32 @@ class Repository:
             if not chunks or not mentions:
                 return 0
 
-            linked = 0
+            windows = []
             for i, m in enumerate(mentions):
                 begin_ms = int(m["timestamp_seconds"]) * 1000
                 nxt = mentions[i + 1]["timestamp_seconds"] * 1000 if i + 1 < len(mentions) else None
-                stop_ms = min(nxt or begin_ms + MENTION_WINDOW_MS, begin_ms + MENTION_WINDOW_MS)
+                windows.append((begin_ms, min(nxt or begin_ms + MENTION_WINDOW_MS, begin_ms + MENTION_WINDOW_MS)))
 
+            linked = 0
+            for i, m in enumerate(mentions):
+                begin_ms, stop_ms = windows[i]
                 parts = []
                 for c in chunks:
                     if c["end_ms"] <= begin_ms or c["start_ms"] >= stop_ms:
                         continue
-                    parts.append(_slice_chunk(c, begin_ms, stop_ms))
-                text = " ".join(x for x in parts if x).strip()
+                    if c["start_ms"] >= begin_ms and c["end_ms"] <= stop_ms:
+                        parts.append(c["text"].strip())
+                    elif len(c["text"]) < MIN_SLICE_CHARS:
+                        # Too short to split without shredding it; it belongs to
+                        # whichever mention it sits inside the most.
+                        if _dominant_window(c, windows) == i:
+                            parts.append(c["text"].strip())
+                    else:
+                        parts.append(_slice_chunk(c, begin_ms, stop_ms))
 
                 if parts:
                     parts[0] = _snap_to_name(parts[0], m["display_name"])
-                    text = " ".join(x for x in parts if x).strip()
+                text = " ".join(x for x in parts if x).strip()
 
                 if not text:
                     nearest = min(
@@ -448,6 +460,16 @@ class Repository:
                     now_iso(),
                 ),
             )
+
+
+def _dominant_window(chunk: dict[str, Any], windows: list[tuple[int, int]]) -> int:
+    """Index of the mention window this chunk overlaps most, or -1 for none."""
+    best, best_overlap = -1, 0
+    for i, (begin_ms, stop_ms) in enumerate(windows):
+        overlap = min(chunk["end_ms"], stop_ms) - max(chunk["start_ms"], begin_ms)
+        if overlap > best_overlap:
+            best, best_overlap = i, overlap
+    return best
 
 
 def _slice_chunk(chunk: dict[str, Any], begin_ms: int, stop_ms: int) -> str:
