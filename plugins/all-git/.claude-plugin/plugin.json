@@ -1,6 +1,6 @@
 {
   "name": "all-git",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Searchable local catalog of repos featured by the GitHub Awesome channel, with timestamped evidence and self-updates.",
   "author": {
     "name": "Pu11en",
@@ -17,7 +17,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/Pu11en/all-git@v0.1.0",
+        "git+https://github.com/Pu11en/all-git@v0.1.1",
         "all-git-mcp"
       ]
     }

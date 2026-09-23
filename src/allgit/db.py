@@ -346,14 +346,19 @@ class Repository:
         tokens = clean_tokens(query)
         if not tokens:
             return []
-        match = " OR ".join(f'"{t}"' for t in tokens)
+        quoted = [f'"{t}"' for t in tokens]
+        matches = [" ".join(quoted), " OR ".join(quoted)]
         with self.reading() as conn:
-            rows = conn.execute(
-                """SELECT f.repo_id, bm25(search_fts, 3.0, 3.0, 2.0, 1.0) AS score
-                   FROM search_fts f WHERE search_fts MATCH ?
-                   ORDER BY score LIMIT ?""",
-                (match, int(limit)),
-            ).fetchall()
+            rows = []
+            for match in matches:
+                rows = conn.execute(
+                    """SELECT f.repo_id, bm25(search_fts, 0.0, 3.0, 3.0, 2.0, 1.0) AS score
+                       FROM search_fts f WHERE search_fts MATCH ?
+                       ORDER BY score LIMIT ?""",
+                    (match, int(limit)),
+                ).fetchall()
+                if rows:
+                    break
             results = []
             for row in rows:
                 detail = conn.execute(

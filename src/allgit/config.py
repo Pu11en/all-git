@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 APP_NAME = "allgit"
 CHANNEL_URL = "https://www.youtube.com/@GithubAwesome"
 DEFAULT_LANGUAGE = "en"

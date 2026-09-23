@@ -89,6 +89,10 @@ def fetch_caption_chunks(video_id: str, language: str = DEFAULT_LANGUAGE) -> lis
     with _client() as ydl:
         info = ydl.extract_info(f"https://youtu.be/{video_id}", download=False)
     tracks = ((info or {}).get("subtitles") or {}).get(language) or []
+    if not tracks:
+        # Most channel captions are YouTube auto-generated and live here.
+        auto = (info or {}).get("automatic_captions") or {}
+        tracks = auto.get(language) or []
     track = next((t for t in tracks if t.get("ext") == "vtt"), None)
     if track is None:
         return []

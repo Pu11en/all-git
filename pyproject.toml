@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "all-git"
-version = "0.1.0"
+version = "0.1.1"
 description = "Searchable local catalog of every repo featured by the GitHub Awesome channel, with timestamped evidence and self-updates."
 readme = "README.md"
 requires-python = ">=3.10"

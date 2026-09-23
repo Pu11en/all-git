@@ -9,7 +9,7 @@
       "name": "all-git",
       "source": "./plugins/all-git",
       "description": "Searchable local catalog of repos featured by the GitHub Awesome channel, with timestamped evidence and self-updates.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

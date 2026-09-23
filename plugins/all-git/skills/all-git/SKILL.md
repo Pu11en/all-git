@@ -10,7 +10,7 @@ installed during the current task and the client froze its MCP tool
 inventory, use the same-session bridge instead of asking the user to restart:
 
 ```text
-uvx --from git+https://github.com/Pu11en/all-git@v0.1.0 all-git <operation> [arguments]
+uvx --from git+https://github.com/Pu11en/all-git@v0.1.1 all-git <operation> [arguments]
 ```
 
 Bridge operations match the four tools and emit the same structured JSON.

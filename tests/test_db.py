@@ -118,3 +118,21 @@ def test_straddling_chunk_credits_the_right_repo(tmp_path: Path) -> None:
     ledger = repo.get_repo("acme", "ledger")["mentions"][0]["excerpt"]
     assert ledger.startswith("Ledger")
     assert "print queue" not in ledger
+
+
+def test_search_and_first_ranks_precise(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    # Both tokens appear in the same repo's prose: AND match wins.
+    hits = repo.search("gitmal mail")
+    assert hits and all(h["name"] == "gitmal" for h in hits)
+
+
+def test_search_falls_back_to_or(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    # One token matches a repo, the other matches nothing: the AND pass must
+    # fail and the OR fallback must still return the matching repo.
+    hits = repo.search("gitmal nonexistenttoken")
+    names = {h["name"] for h in hits}
+    assert "gitmal" in names
