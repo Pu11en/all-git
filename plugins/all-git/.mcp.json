@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "all-git": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Pu11en/all-git@v0.1.0",
+        "all-git-mcp"
+      ]
+    }
+  }
+}

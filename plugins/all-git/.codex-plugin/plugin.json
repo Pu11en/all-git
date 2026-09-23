@@ -1,0 +1,25 @@
+{
+  "name": "all-git",
+  "version": "0.1.0",
+  "description": "Searchable local catalog of repos featured by the GitHub Awesome channel, with timestamped evidence and self-updates.",
+  "author": {
+    "name": "Pu11en",
+    "url": "https://github.com/Pu11en"
+  },
+  "homepage": "https://github.com/Pu11en/all-git",
+  "repository": "https://github.com/Pu11en/all-git",
+  "license": "MIT",
+  "keywords": ["github", "repos", "catalog", "search", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "all-git": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Pu11en/all-git@v0.1.0",
+        "all-git-mcp"
+      ]
+    }
+  }
+}
