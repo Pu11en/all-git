@@ -158,6 +158,23 @@ class Repository:
         with self.reading() as conn:
             return [dict(r) for r in conn.execute(sql).fetchall()]
 
+    def videos_needing_excerpt_link(self) -> list[str]:
+        """Videos whose captions exist but whose mentions were never linked to them.
+
+        Mentions are created from the description pass and excerpts from the caption
+        pass. When those land in different runs the link is missed, and because
+        caption_fetched_at is already set the caption pass never revisits the video.
+        """
+        with self.reading() as conn:
+            return [
+                r[0]
+                for r in conn.execute(
+                    """SELECT DISTINCT m.video_id FROM mentions m
+                       WHERE (m.excerpt IS NULL OR m.excerpt = '')
+                         AND EXISTS (SELECT 1 FROM chunks c WHERE c.video_id = m.video_id)"""
+                ).fetchall()
+            ]
+
     def video_ids_with_captions(self) -> set[str]:
         with self.reading() as conn:
             return {r[0] for r in conn.execute("SELECT DISTINCT video_id FROM chunks")}

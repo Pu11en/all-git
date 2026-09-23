@@ -94,6 +94,13 @@ def _sync(
                 report["captions_fetched"] += 1
             repo.set_video_caption_fetched(video["video_id"])
 
+    # Link any video whose captions exist but whose mentions were never joined to
+    # them; without this the search index stays name-only for those repos forever.
+    relinked = 0
+    for video_id in repo.videos_needing_excerpt_link():
+        relinked += repo.link_mention_excerpts(video_id)
+    report["excerpts_relinked"] = relinked
+
     repo.rebuild_search_index()
     after = repo.counts()
     report["new_videos"] = after["videos"] - before["videos"]
