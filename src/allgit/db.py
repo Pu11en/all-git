@@ -88,6 +88,9 @@ def clean_tokens(query: str) -> list[str]:
     return [t for t in tokens if t.lower() not in {"the", "and", "for", "with", "that"}]
 
 
+# Longest stretch of narration credited to a single repo mention.
+MENTION_WINDOW_MS = 120_000
+
 class Repository:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
@@ -242,33 +245,63 @@ class Repository:
             )
 
     def link_mention_excerpts(self, video_id: str) -> int:
-        """Attach the nearest caption chunk to each mention of one video."""
+        """Attach each mention's own stretch of narration.
+
+        A video description lists every repo as `MM:SS - Name url`, so consecutive
+        mention timestamps bound the narration about one repo. Caption chunks are
+        coarser than that and routinely straddle two repos, so a chunk that only
+        partly overlaps the window is sliced proportionally by time and the start
+        is snapped to where the host actually says the repo's name. Taking the
+        whole nearest chunk instead credits a repo with its neighbour's pitch.
+        """
         with self.transaction() as conn:
-            mentions = conn.execute(
-                "SELECT mention_id, timestamp_seconds FROM mentions WHERE video_id=?",
-                (video_id,),
-            ).fetchall()
-            chunks = conn.execute(
-                "SELECT chunk_id, start_ms, end_ms, text FROM chunks WHERE video_id=? ORDER BY start_ms",
-                (video_id,),
-            ).fetchall()
-            if not chunks:
+            mentions = [
+                dict(r)
+                for r in conn.execute(
+                    """SELECT mention_id, timestamp_seconds, display_name FROM mentions
+                       WHERE video_id=? ORDER BY timestamp_seconds""",
+                    (video_id,),
+                ).fetchall()
+            ]
+            chunks = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT start_ms, end_ms, text FROM chunks WHERE video_id=? ORDER BY start_ms",
+                    (video_id,),
+                ).fetchall()
+            ]
+            if not chunks or not mentions:
                 return 0
+
             linked = 0
-            for m in mentions:
-                ts_ms = int(m["timestamp_seconds"]) * 1000
-                best = min(
-                    chunks,
-                    key=lambda c: abs(((c["start_ms"] + c["end_ms"]) // 2) - ts_ms),
-                    default=None,
-                )
-                if best is None:
-                    continue
-                if abs(((best["start_ms"] + best["end_ms"]) // 2) - ts_ms) > 120_000:
-                    continue
+            for i, m in enumerate(mentions):
+                begin_ms = int(m["timestamp_seconds"]) * 1000
+                nxt = mentions[i + 1]["timestamp_seconds"] * 1000 if i + 1 < len(mentions) else None
+                stop_ms = min(nxt or begin_ms + MENTION_WINDOW_MS, begin_ms + MENTION_WINDOW_MS)
+
+                parts = []
+                for c in chunks:
+                    if c["end_ms"] <= begin_ms or c["start_ms"] >= stop_ms:
+                        continue
+                    parts.append(_slice_chunk(c, begin_ms, stop_ms))
+                text = " ".join(x for x in parts if x).strip()
+
+                if parts:
+                    parts[0] = _snap_to_name(parts[0], m["display_name"])
+                    text = " ".join(x for x in parts if x).strip()
+
+                if not text:
+                    nearest = min(
+                        chunks,
+                        key=lambda c: abs(((c["start_ms"] + c["end_ms"]) // 2) - begin_ms),
+                    )
+                    if abs(((nearest["start_ms"] + nearest["end_ms"]) // 2) - begin_ms) > MENTION_WINDOW_MS:
+                        continue
+                    text = nearest["text"].strip()
+
                 conn.execute(
                     "UPDATE mentions SET excerpt=? WHERE mention_id=?",
-                    (best["text"][:600], m["mention_id"]),
+                    (text[:1200], m["mention_id"]),
                 )
                 linked += 1
             return linked
@@ -415,3 +448,37 @@ class Repository:
                     now_iso(),
                 ),
             )
+
+
+def _slice_chunk(chunk: dict[str, Any], begin_ms: int, stop_ms: int) -> str:
+    """The part of one caption chunk that falls inside a mention's window."""
+    text = chunk["text"]
+    span = max(chunk["end_ms"] - chunk["start_ms"], 1)
+    if chunk["start_ms"] >= begin_ms and chunk["end_ms"] <= stop_ms:
+        return text.strip()
+    head = max(0.0, (begin_ms - chunk["start_ms"]) / span)
+    tail = min(1.0, (stop_ms - chunk["start_ms"]) / span)
+    return text[int(len(text) * head) : int(len(text) * tail)].strip()
+
+
+def _snap_to_name(text: str, display_name: str) -> str:
+    """Start the excerpt where the host names the repo, or at a sentence break.
+
+    Captions mangle names ("Herilla" for horilla), so only the first word is
+    matched and only near the front of the slice; otherwise a sentence boundary
+    is a safer start than mid-clause.
+    """
+    if not text:
+        return text
+    first = re.split(r"[\s\-_/.]+", display_name.strip())[0].lower()
+    if len(first) >= 4:
+        window = text[: max(len(text) // 2, 200)].lower()
+        at = window.find(first)
+        if at == -1:
+            at = window.find(first.replace(" ", ""))
+        if at > 0:
+            return text[at:].strip()
+    period = text.find(". ")
+    if 0 < period < len(text) // 3:
+        return text[period + 2 :].strip()
+    return text
