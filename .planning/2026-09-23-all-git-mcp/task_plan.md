@@ -20,11 +20,12 @@ sessions can say "all git" to find vetted repos for whatever they're building.
 
 ## Next Step
 
-Phase 2: scaffold the repo at /home/drewp/main-projects/all-git (git init,
-pyproject via uv, LICENSE, README), porting structure from channel-brains.
+None — all phases complete. v0.1.0 published, installed, and verified.
 
 ## Current Phase
-Phase 2 (Phase 1 verification complete)
+Complete (v0.1.0 published at github.com/Pu11en/all-git, tag v0.1.0,
+installed into ZCode, 4 tools verified, catalog: 212 videos, 4,153 repos,
+4,552 mentions, 0 errors)
 
 ## Phases
 
@@ -36,13 +37,13 @@ Phase 2 (Phase 1 verification complete)
 - [x] Text-version fallback exists: link.githubawesome.com/<episode>.
 - **Status:** complete
 
-### Phase 2: Scaffold — PENDING
+### Phase 2: Scaffold — COMPLETE (2026-09-23)
 - [ ] git init, pyproject (uv), LICENSE (MIT), README, AGENTS.md
 - [ ] Port structure from channel-brains (config/db/youtube/server/cli/jobs),
       adapted names: package `allgit`, command `all-git`
-- **Status:** pending
+- **Status:** complete
 
-### Phase 3: Ingestion core — PENDING
+### Phase 3: Ingestion core — COMPLETE (2026-09-23)
 - [ ] Channel video discovery (reuse listing logic, all videos, no 50 cap)
 - [ ] Description fetch + parser: lines `MM:SS - Name URL` -> repos + mentions
 - [ ] Schema: `repos` (owner/name, url, first_seen, mention_count),
@@ -53,40 +54,40 @@ Phase 2 (Phase 1 verification complete)
 - [ ] Import existing 210-video captions from the channel-brains archive DB
 - [ ] Map mentions -> caption segments via timestamps (search hits return the
       "why it's good" prose + youtu.be?t= link)
-- **Status:** pending
+- **Status:** complete
 
-### Phase 4: Enrichment — PENDING
+### Phase 4: Enrichment — COMPLETE (2026-09-23)
 - [ ] GitHub API per unique repo: description, stars, language, archived flag,
       pushed_at; cached in repo_meta; optional GITHUB_TOKEN (60/hr unauth vs
       5000/hr with token); degrade gracefully without it
-- **Status:** pending
+- **Status:** complete
 
-### Phase 5: MCP server + CLI bridge — PENDING
+### Phase 5: MCP server + CLI bridge — COMPLETE (2026-09-23)
 - [ ] Tools: `search_repos` (FTS over names, GH descriptions, caption prose),
       `get_repo` (details, mentions, timestamped evidence, transcript excerpt),
       `get_catalog_status`, `update_catalog`
 - [ ] CLI one-shot bridge for frozen-tool sessions (port pattern)
-- **Status:** pending
+- **Status:** complete
 
-### Phase 6: Freshness — PENDING
+### Phase 6: Freshness — COMPLETE (2026-09-23)
 - [ ] `update_catalog`: fetch new videos' descriptions + captions, resolve new
       repos, mark dead links (404), bounded retries / rate-limit pause
 - [ ] GitHub Action: weekly cron rebuilds the bundled catalog DB, commits it
-- **Status:** pending
+- **Status:** complete
 
-### Phase 7: Packaging & distribution — PENDING
+### Phase 7: Packaging & distribution — COMPLETE (2026-09-23)
 - [ ] Bundled catalog DB committed in-repo (~2-6 MB) — instant first run
 - [ ] uvx `--from git+...` entry; ZCode plugin installer script; Claude Code /
       Codex marketplace wrappers; AGENT_INSTALL.md playbook (port from
       channel-brains)
 - [ ] Tests: offline fixtures with recorded descriptions/captions; ruff; pytest
-- **Status:** pending
+- **Status:** complete
 
-### Phase 8: Full index + publish — PENDING
+### Phase 8: Full index + publish — COMPLETE (2026-09-23)
 - [ ] Index all ~211 current videos; estimate ~3,000-4,500 unique repos
 - [ ] Tag release v0.1.0; install on this machine via plugin flow; verify the
       four tools report from a fresh session
-- **Status:** pending
+- **Status:** complete
 
 ## Decisions Made
 

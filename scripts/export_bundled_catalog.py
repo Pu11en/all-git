@@ -11,6 +11,7 @@ from pathlib import Path
 
 from allgit.config import catalog_path
 from allgit.db import Repository
+from allgit.enrich import enrich
 from allgit.sync import sync_catalog
 
 
@@ -19,6 +20,7 @@ def main() -> None:
     repo = Repository(target)
     report = sync_catalog(repo)
     print(report["counts"])
+    print(enrich(repo))
     destination = Path(__file__).resolve().parents[1] / "src" / "allgit" / "catalog.sqlite3"
     shutil.copyfile(target, destination)
     print(f"bundled catalog written to {destination}")

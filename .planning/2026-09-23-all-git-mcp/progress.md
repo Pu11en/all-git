@@ -23,3 +23,37 @@
 
 ### Session: 2026-09-23 (build run)
 - Phase 2-8 execution started. Status: in_progress
+
+### Session: 2026-09-23 (build run) — COMPLETE
+
+- Phase 2: scaffolded repo (git, pyproject/hatchling, MIT, README, AGENTS.md)
+- Phase 3: schema (videos/repos/mentions/chunks/repo_meta/FTS5), description
+  parser, sync engine with lock; imported 210 videos of captions from the
+  channel-brains archive (brain 6b9c30148fa6)
+- Phase 4: enrichment module (GITHUB_TOKEN-aware, 45/hr unauth budget)
+- Phase 5: MCP server (4 tools) + `all-git` CLI bridge; --check preflight
+- Phase 6: update_catalog + weekly GitHub Action (refresh-catalog.yml) with
+  enrichment wired in; scripts/export_bundled_catalog.py
+- Phase 7: bundled 5.2 MB catalog at src/allgit/catalog.sqlite3; plugin
+  wrappers (.zcode/.claude/.codex + SKILL.md); AGENT_INSTALL.md; marketplace
+  manifests; ZCode installer script (adapted, preserves other plugins)
+- Phase 8: live sync 212/212 descriptions (0 errors) => 4,153 repos, 4,552
+  mentions; ruff clean; 19 tests pass; uv build ok; published
+  github.com/Pu11en/all-git; tag v0.1.0; pinned-tag uvx verified; ZCode
+  plugin installed (portable-planner preserved)
+
+### Test Results
+- ruff: all checks passed
+- pytest: 19 passed
+- uv build: sdist + wheel (wheel includes bundled catalog)
+- Live verification: `all-git-mcp --check` => tool_count 4;
+  search_repos 'logo SVG' => op7418/logo-generator-skill,
+  shaom/svg-hand-drawn-skill; get_repo coffinxp/crtmon => Weekly #17 @ 3:23
+
+### Errors fixed during build
+- hatchling build failed: README.md missing -> wrote it first
+- malformed SQL params in upsert_repo + invalid FTS 'rebuild' on standalone
+  table -> rewritten
+- mcp wraps tool ValueError in ToolError -> test expectation adjusted
+- data dir not created on direct Repository(path) -> connect() mkdirs parent
+- ruff RUF001 en dash -> escaped as \u2013 in regex
