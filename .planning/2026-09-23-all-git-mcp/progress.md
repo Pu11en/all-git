@@ -57,3 +57,20 @@
 - mcp wraps tool ValueError in ToolError -> test expectation adjusted
 - data dir not created on direct Repository(path) -> connect() mkdirs parent
 - ruff RUF001 en dash -> escaped as \u2013 in regex
+
+### Session: 2026-09-23 (fix pass) — v0.1.1
+
+- Drew reported first real catalog use from his Discord agent; spot-checked
+  findings were genuine catalog entries
+- Fixes shipped in v0.1.1: caption automatic_captions fallback (verified 34
+  chunks live), bm25 five-column weights, AND-first/OR-fallback search
+- Co-agent (drewai) had committed 3 attribution improvements locally; merged
+  cleanly on top, adjusted one test to the new attribution model
+- Integrity checks: no missing caption attempts (2 videos legitimately have
+  no speech); 32 low-chunk videos are short uploads, not corruption;
+  enrichment already live (45 enriched, 3 dead flagged)
+- v0.1.1 pushed + tagged; ~/.claude.json, codex config.toml, ZCode plugin
+  copy all repinned; refresh-catalog workflow triggered for full enrichment
+
+### Test Results (v0.1.1)
+- ruff: all checks passed; pytest: 22 passed; uv build: ok (wheel bundles catalog)

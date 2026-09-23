@@ -20,7 +20,8 @@ sessions can say "all git" to find vetted repos for whatever they're building.
 
 ## Next Step
 
-None — all phases complete. v0.1.0 published, installed, and verified.
+None — v0.1.1 shipped. The weekly refresh-catalog Action maintains the
+catalog autonomously (first full enrichment run triggered 2026-09-23).
 
 ## Current Phase
 Complete (v0.1.0 published at github.com/Pu11en/all-git, tag v0.1.0,
@@ -103,4 +104,18 @@ installed into ZCode, 4 tools verified, catalog: 212 videos, 4,153 repos,
 ## Errors Encountered
 | Error | Resolution |
 |-------|------------|
-| (none yet) | |
+| Caption fetch returned 0 chunks on known-captioned video | Captions live in yt-dlp automatic_captions, not subtitles; fallback added (v0.1.1) |
+| FTS bm25 weights covered 4 of 5 columns | Reweighted (0,3,3,2,1) (v0.1.1) |
+| Vague queries returned 1 result | AND-first with OR fallback search (v0.1.1) |
+| Headless claude -p blocked MCP tools | mcp__all-git__* allowlisted in ~/.claude/settings.json |
+
+### Phase 9: First-use fixes — COMPLETE (2026-09-23)
+- [x] Caption source bug (automatic_captions fallback) — found via live test
+- [x] bm25 column-weight alignment
+- [x] AND-first search with OR fallback (+ regression tests)
+- [x] Merged co-agent's attribution work (3 commits: prose relink,
+      per-mention narration, short-chunk protection) — kept intact
+- [x] v0.1.1 tagged/pushed; Claude, Codex, ZCode registrations repinned
+- [x] Weekly enrichment workflow triggered (45 repos already enriched
+      locally, 3 dead flagged, before the full Action run)
+- **Status:** complete
