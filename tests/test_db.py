@@ -136,3 +136,43 @@ def test_search_falls_back_to_or(tmp_path: Path) -> None:
     hits = repo.search("gitmal nonexistenttoken")
     names = {h["name"] for h in hits}
     assert "gitmal" in names
+
+
+def test_mention_count_is_per_repo(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    gitmal = repo.upsert_repo("antonmedv", "gitmal", "https://github.com/antonmedv/gitmal", "Gitmal", "fOU0lDCeNwo")
+    repo.add_mention(gitmal, "fOU0lDCeNwo", 300, "Gitmal again")
+    assert repo.get_repo("antonmedv", "gitmal")["mention_count"] == 2
+    assert repo.get_repo("other", "thing")["mention_count"] == 1
+
+
+def test_upsert_repo_ignores_case(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    same = repo.upsert_repo("AntonMedv", "Gitmal", "https://github.com/AntonMedv/Gitmal", "GitMal", "fOU0lDCeNwo")
+    assert same == repo.get_repo("antonmedv", "gitmal")["repo_id"]
+    assert repo.counts()["repos"] == 2
+
+
+def test_repair_merges_case_twins_and_git_suffix(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    with repo.transaction() as conn:
+        conn.execute(
+            "INSERT INTO repos (owner, name, url, display_names) VALUES"
+            " ('AntonMedv', 'Gitmal', 'u', 'Twin'), ('lab', 'brain.git', 'u', 'Brain')"
+        )
+        twin = conn.execute("SELECT repo_id FROM repos WHERE owner='AntonMedv'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO mentions (repo_id, video_id, timestamp_seconds, display_name)"
+            " VALUES (?, 'fOU0lDCeNwo', 500, 'Twin')",
+            (twin,),
+        )
+    assert repo.repair() == {"repos_merged": 1}
+    repo.rebuild_search_index()
+    detail = repo.get_repo("antonmedv", "gitmal")
+    assert detail["mention_count"] == 2
+    assert "Twin" in detail["display_names"]
+    fixed = repo.get_repo("lab", "brain")
+    assert fixed is not None and fixed["url"] == "https://github.com/lab/brain"

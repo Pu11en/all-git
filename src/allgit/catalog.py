@@ -19,21 +19,22 @@ def parse_description(description: str) -> list[dict[str, Any]]:
         match = GITHUB_LINE.match(line)
         if match is None:
             continue
-        stamp, display, url, owner, name = match.groups()
+        stamp, display, _url, owner, name = match.groups()
         seconds = _seconds(stamp)
         if seconds is None:
             continue
-        key = (f"{owner.lower()}/{name.lower()}", seconds)
+        key = (f"{owner.lower()}/{_clean_name(name).lower()}", seconds)
         if key in seen:
             continue
         seen.add(key)
+        name = _clean_name(name)
         mentions.append(
             {
                 "timestamp_seconds": seconds,
                 "display_name": display.strip()[:200],
-                "url": url,
+                "url": f"https://github.com/{owner}/{name}",
                 "owner": owner,
-                "name": name.rstrip("."),
+                "name": name,
             }
         )
     return mentions
@@ -47,3 +48,11 @@ def _seconds(stamp: str) -> int | None:
         minutes, seconds = int(match.group(1)), int(match.group(2))
         return minutes * 60 + seconds
     return int(match.group(1)) * 3600 + int(match.group(2)) * 60 + int(match.group(3))
+
+
+def _clean_name(name: str) -> str:
+    """Drop a trailing '.' (sentence punctuation) and a '.git' clone suffix."""
+    name = name.rstrip(".")
+    if name.lower().endswith(".git") and len(name) > 4:
+        name = name[:-4]
+    return name

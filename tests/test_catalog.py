@@ -53,3 +53,9 @@ def test_dedupes_repeated_mentions():
     mentions = parse_description(doubled)
     hits = [m for m in mentions if m["name"] == "ui-ux-pro-max-skill"]
     assert len(hits) == 1
+
+
+def test_strips_git_clone_suffix():
+    [mention] = parse_description("00:05 - Brain https://github.com/Lumen-Labs/brainapi2.git\n")
+    assert mention["name"] == "brainapi2"
+    assert mention["url"] == "https://github.com/Lumen-Labs/brainapi2"

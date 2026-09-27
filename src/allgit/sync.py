@@ -101,6 +101,7 @@ def _sync(
         relinked += repo.link_mention_excerpts(video_id)
     report["excerpts_relinked"] = relinked
 
+    report["repos_merged"] = repo.repair()["repos_merged"]
     repo.rebuild_search_index()
     after = repo.counts()
     report["new_videos"] = after["videos"] - before["videos"]

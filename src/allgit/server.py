@@ -21,6 +21,9 @@ TOOL_NAMES = (
     "update_catalog",
 )
 
+# Repos enriched per update_catalog call, so one tool call stays a few minutes long.
+TOOL_ENRICH_LIMIT = 300
+
 INSTRUCTIONS = """all-git is a local, self-updating catalog of every repository featured
 by the GitHub Awesome YouTube channel. Use search_repos to find curated repos for a task,
 get_repo for details and timestamped video evidence, get_catalog_status for coverage
@@ -200,7 +203,7 @@ def build_server(repo: Repository) -> MCPServer:
         report = synchronization.sync_catalog(repo, fetch_captions=fetch_captions)
         result = UpdateResult(**report)
         if enrich_meta:
-            enrichment_report = enrichment.enrich(repo)
+            enrichment_report = enrichment.enrich(repo, limit=TOOL_ENRICH_LIMIT)
             result.enriched = enrichment_report["enriched"]
             result.marked_dead = enrichment_report["marked_dead"]
             result.counts = repo.counts()

@@ -205,8 +205,11 @@ class Repository:
     # -- repos and mentions --------------------------------------------
     def upsert_repo(self, owner: str, name: str, url: str, display_name: str, video_id: str) -> int:
         with self.transaction() as conn:
+            # GitHub names are case-insensitive; descriptions are not consistent.
             row = conn.execute(
-                "SELECT repo_id, display_names FROM repos WHERE owner=? AND name=?",
+                """SELECT repo_id, display_names FROM repos
+                   WHERE lower(owner)=lower(?) AND lower(name)=lower(?)
+                   ORDER BY repo_id LIMIT 1""",
                 (owner, name),
             ).fetchone()
             if row is None:
@@ -242,8 +245,9 @@ class Repository:
                 (repo_id, video_id, timestamp_seconds, display_name),
             )
             conn.execute(
-                "UPDATE repos SET mention_count=(SELECT COUNT(*) FROM mentions WHERE repo_id=?)",
-                (repo_id,),
+                """UPDATE repos SET mention_count=(SELECT COUNT(*) FROM mentions WHERE repo_id=?)
+                   WHERE repo_id=?""",
+                (repo_id, repo_id),
             )
 
     def link_mention_excerpts(self, video_id: str) -> int:
@@ -318,8 +322,56 @@ class Repository:
                 linked += 1
             return linked
 
+    def repair(self) -> dict[str, int]:
+        """Fix identity problems left by older versions.
+
+        Strips '.git' clone suffixes from repo names and merges repos that differ
+        only by letter case into the earliest entry, keeping all their mentions.
+        """
+        merged = 0
+        with self.transaction() as conn:
+            _strip_git_suffixes(conn)
+            groups = conn.execute(
+                """SELECT GROUP_CONCAT(repo_id) AS ids FROM (
+                       SELECT repo_id, lower(owner) AS o,
+                              lower(CASE WHEN lower(name) LIKE '%_.git'
+                                         THEN substr(name, 1, length(name) - 4)
+                                         ELSE name END) AS n
+                       FROM repos ORDER BY repo_id)
+                   GROUP BY o, n HAVING COUNT(*) > 1"""
+            ).fetchall()
+            for group in groups:
+                keep, *drop = sorted(int(x) for x in group["ids"].split(","))
+                for dup in drop:
+                    names = conn.execute(
+                        "SELECT display_names FROM repos WHERE repo_id IN (?, ?) ORDER BY repo_id",
+                        (keep, dup),
+                    ).fetchall()
+                    joined: list[str] = []
+                    for r in names:
+                        joined += [n for n in r[0].split("|") if n and n not in joined]
+                    conn.execute(
+                        "UPDATE OR IGNORE mentions SET repo_id=? WHERE repo_id=?", (keep, dup)
+                    )
+                    conn.execute(
+                        "INSERT OR IGNORE INTO repo_meta SELECT ?, gh_description, stars, language,"
+                        " archived, pushed_at, dead, fetched_at FROM repo_meta WHERE repo_id=?",
+                        (keep, dup),
+                    )
+                    conn.execute("DELETE FROM repos WHERE repo_id=?", (dup,))
+                    conn.execute(
+                        "UPDATE repos SET display_names=? WHERE repo_id=?", ("|".join(joined), keep)
+                    )
+                    merged += 1
+            _strip_git_suffixes(conn)  # a kept entry may still carry the suffix
+        return {"repos_merged": merged}
+
     def rebuild_search_index(self) -> None:
         with self.transaction() as conn:
+            conn.execute(
+                """UPDATE repos SET mention_count=
+                   (SELECT COUNT(*) FROM mentions x WHERE x.repo_id = repos.repo_id)"""
+            )
             rows = conn.execute(
                 """SELECT r.repo_id, r.owner, r.name, r.display_names,
                           COALESCE(m.gh_description, '') AS gh,
@@ -465,6 +517,17 @@ class Repository:
                     now_iso(),
                 ),
             )
+
+
+def _strip_git_suffixes(conn: sqlite3.Connection) -> None:
+    for row in conn.execute(
+        "SELECT repo_id, owner, name FROM repos WHERE lower(name) LIKE '%_.git'"
+    ).fetchall():
+        name = row["name"][:-4]
+        conn.execute(
+            "UPDATE OR IGNORE repos SET name=?, url=? WHERE repo_id=?",
+            (name, f"https://github.com/{row['owner']}/{name}", row["repo_id"]),
+        )
 
 
 def _dominant_window(chunk: dict[str, Any], windows: list[tuple[int, int]]) -> int:

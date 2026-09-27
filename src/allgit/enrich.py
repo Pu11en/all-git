@@ -34,15 +34,27 @@ def _headers() -> dict[str, str]:
     return headers
 
 
+class RateLimited(Exception):
+    """GitHub refused further requests for now; stop and keep what we have."""
+
+
+# Repos GitHub will not serve: gone (404/410) or blocked, e.g. DMCA (451).
+_DEAD_CODES = {404, 410, 451}
+
+
 def _fetch(owner: str, name: str) -> dict[str, Any] | None:
     request = urllib.request.Request(API.format(owner=owner, name=name), headers=_headers())
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        if exc.code == 404:
+        if exc.code in _DEAD_CODES:
             return {"dead": True}
-        raise
+        if exc.code in (403, 429):  # primary and secondary rate limits
+            raise RateLimited(str(exc)) from exc
+        return None
+    except (urllib.error.URLError, TimeoutError, ValueError):
+        return None
     return {
         "gh_description": data.get("description"),
         "stars": data.get("stargazers_count"),
@@ -54,14 +66,20 @@ def _fetch(owner: str, name: str) -> dict[str, Any] | None:
 
 
 def enrich(repo: Repository, limit: int | None = None) -> dict[str, int]:
+    """Fill GitHub metadata for repos that have none; never raises on API trouble."""
     budget = _budget()
     cap = min(budget, limit) if limit is not None else budget
     pending = repo.repos_missing_meta(limit=cap)
-    enriched = 0
-    dead = 0
+    enriched = dead = skipped = 0
+    rate_limited = False
     for row in pending:
-        meta = _fetch(row["owner"], row["name"])
+        try:
+            meta = _fetch(row["owner"], row["name"])
+        except RateLimited:
+            rate_limited = True
+            break
         if meta is None:
+            skipped += 1
             continue
         repo.set_repo_meta(row["repo_id"], meta)
         if meta.get("dead"):
@@ -70,4 +88,11 @@ def enrich(repo: Repository, limit: int | None = None) -> dict[str, int]:
             enriched += 1
         time.sleep(0.12)
     repo.rebuild_search_index()
-    return {"enriched": enriched, "marked_dead": dead, "remaining": max(0, len(pending) - cap + 0)}
+    counts = repo.counts()
+    return {
+        "enriched": enriched,
+        "marked_dead": dead,
+        "skipped": skipped,
+        "rate_limited": int(rate_limited),
+        "remaining": counts["repos"] - counts["enriched"],
+    }
