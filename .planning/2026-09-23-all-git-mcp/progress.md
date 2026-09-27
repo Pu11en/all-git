@@ -74,3 +74,20 @@
 
 ### Test Results (v0.1.1)
 - ruff: all checks passed; pytest: 22 passed; uv build: ok (wheel bundles catalog)
+
+### Session: 2026-09-27 (audit) — v0.1.2 (local, not pushed)
+
+- Audit found: mention_count was 1 on every repo (UPDATE without WHERE);
+  2 case-twin repos + 1 '.git'-suffixed repo; the only weekly refresh run
+  (2026-09-23) crashed on a DMCA-blocked repo (HTTP 451); GitHub's 403
+  "Repository access blocked" must not be mistaken for a rate limit;
+  enrich 'remaining' was always 0; workflow actions on deprecated Node 20
+- All fixed with tests (29 pass); repair runs on every sync
+- Synced 2 new videos (Trending Today #51, Weekly #50) => 214 videos,
+  4,221 repos, 4,622 mentions; full GitHub enrichment 4,221/4,221 (67 dead)
+- Captions for the 2 new videos blocked by YouTube 429 on this machine;
+  they stay pending and the next update_catalog retries them
+- Known, not fixed: videos.upload_date is NULL for all videos (flat listing
+  has no dates); upgrading the package never refreshes an existing user
+  catalog from the newer bundled one
+- Needs after Drew's OK: push, tag v0.1.2, repin clients to @v0.1.2

@@ -42,16 +42,22 @@ class RateLimited(Exception):
 _DEAD_CODES = {404, 410, 451}
 
 
+def _is_rate_limit(exc: urllib.error.HTTPError) -> bool:
+    """Primary limits zero the remaining count; secondary limits send Retry-After."""
+    headers = exc.headers or {}
+    return headers.get("X-RateLimit-Remaining") == "0" or headers.get("Retry-After") is not None
+
+
 def _fetch(owner: str, name: str) -> dict[str, Any] | None:
     request = urllib.request.Request(API.format(owner=owner, name=name), headers=_headers())
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        if exc.code in _DEAD_CODES:
-            return {"dead": True}
-        if exc.code in (403, 429):  # primary and secondary rate limits
+        if exc.code == 429 or (exc.code == 403 and _is_rate_limit(exc)):
             raise RateLimited(str(exc)) from exc
+        if exc.code in _DEAD_CODES or exc.code == 403:  # 403 here: "Repository access blocked"
+            return {"dead": True}
         return None
     except (urllib.error.URLError, TimeoutError, ValueError):
         return None
