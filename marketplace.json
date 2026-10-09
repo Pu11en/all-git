@@ -6,7 +6,7 @@
       "name": "all-git",
       "source": "./plugins/all-git",
       "description": "Searchable local catalog of repos featured by the GitHub Awesome channel, with timestamped evidence and self-updates.",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "category": "Productivity",
       "tags": ["github", "repos", "catalog", "search", "mcp"],
       "strict": true
