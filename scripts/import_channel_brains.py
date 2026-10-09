@@ -56,6 +56,7 @@ def main() -> None:
         )
         repo.replace_chunks(video_id, [dict(c) for c in chunks])
         repo.set_video_caption_fetched(video_id)
+        repo.link_mention_excerpts(video_id)
         imported += 1
 
     repo.rebuild_search_index()
