@@ -56,13 +56,22 @@ def catalog_path() -> Path:
     """User catalog location; seeded from the bundled catalog on first use.
 
     An upgraded package ships a newer bundled catalog, so a local catalog with
-    less coverage than the bundled one is replaced by it.
+    less coverage than the bundled one is replaced by it. Seeding takes the
+    update lock so it never swaps the file out from under a running sync, and
+    the coverage comparison happens inside the lock so a sync that just
+    finished is not discarded.
     """
+    from filelock import FileLock
+
     data_dir = get_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     path = data_dir / "catalog.sqlite3"
     seed = bundled_catalog_path()
-    if seed is not None and (not path.exists() or _coverage(seed) > _coverage(path)):
+    if seed is None:
+        return path
+    with FileLock(str(lock_path())):
+        if path.exists() and _coverage(seed) <= _coverage(path):
+            return path
         staged = data_dir / "catalog.sqlite3.new"
         staged.write_bytes(seed.read_bytes())
         for suffix in ("-wal", "-shm"):

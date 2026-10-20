@@ -484,6 +484,12 @@ class Repository:
             }
 
     def repos_missing_meta(self, limit: int) -> list[dict[str, Any]]:
+        """Repos never enriched, in random order.
+
+        A failed fetch leaves fetched_at NULL and is retried next run; random
+        order keeps a few permanently failing repos from claiming the whole of
+        a small unauthenticated budget every time.
+        """
         with self.reading() as conn:
             return [
                 dict(r)
@@ -491,7 +497,7 @@ class Repository:
                     """SELECT r.repo_id, r.owner, r.name FROM repos r
                        LEFT JOIN repo_meta m ON m.repo_id=r.repo_id
                        WHERE m.repo_id IS NULL OR m.fetched_at IS NULL
-                       LIMIT ?""",
+                       ORDER BY RANDOM() LIMIT ?""",
                     (int(limit),),
                 ).fetchall()
             ]

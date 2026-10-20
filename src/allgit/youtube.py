@@ -97,34 +97,22 @@ def fetch_caption_chunks(video_id: str, language: str = DEFAULT_LANGUAGE) -> lis
     if track is None:
         return []
     vtt_text = ydl.urlopen(track["url"]).read().decode("utf-8", errors="replace")
-    import tempfile
-    from pathlib import Path
+    return chunk_vtt(vtt_text)
 
-    with tempfile.NamedTemporaryFile("w", suffix=".vtt", delete=False) as handle:
-        handle.write(vtt_text)
-        path = handle.name
+
+def chunk_vtt(vtt_text: str) -> list[dict[str, int | str]]:
+    """Group VTT cues into ~45s chunks with millisecond ranges."""
     chunks: list[dict[str, int | str]] = []
-    try:
-        buffer: list[str] = []
-        start_ms = 0
-        end_ms = 0
-        for cue in webvtt.read(path):
-            cue_start, cue_end = _ms(cue.start), _ms(cue.end)
-            if not buffer:
-                start_ms = cue_start
-            buffer.append(cue.text.replace("\n", " ").strip())
-            end_ms = cue_end
-            if end_ms - start_ms >= 40_000 or len(" ".join(buffer)) >= 900:
-                chunks.append(
-                    {
-                        "chunk_index": len(chunks),
-                        "start_ms": start_ms,
-                        "end_ms": end_ms,
-                        "text": " ".join(buffer),
-                    }
-                )
-                buffer = []
-        if buffer:
+    buffer: list[str] = []
+    start_ms = 0
+    end_ms = 0
+    for cue in webvtt.from_string(vtt_text):
+        cue_start, cue_end = _ms(cue.start), _ms(cue.end)
+        if not buffer:
+            start_ms = cue_start
+        buffer.append(cue.text.replace("\n", " ").strip())
+        end_ms = cue_end
+        if end_ms - start_ms >= 40_000 or len(" ".join(buffer)) >= 900:
             chunks.append(
                 {
                     "chunk_index": len(chunks),
@@ -133,8 +121,16 @@ def fetch_caption_chunks(video_id: str, language: str = DEFAULT_LANGUAGE) -> lis
                     "text": " ".join(buffer),
                 }
             )
-    finally:
-        Path(path).unlink(missing_ok=True)
+            buffer = []
+    if buffer:
+        chunks.append(
+            {
+                "chunk_index": len(chunks),
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+                "text": " ".join(buffer),
+            }
+        )
     return chunks
 
 

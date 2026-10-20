@@ -1,4 +1,4 @@
-"""Install the bundled Channel Brains plugin into ZCode user scope."""
+"""Install the bundled all-git plugin into ZCode user scope."""
 
 from __future__ import annotations
 
@@ -125,7 +125,7 @@ def install(source: Path, target: Path, config_path: Path) -> dict[str, object]:
 def main() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(
-        description="Install the bundled Channel Brains plugin into ZCode user scope."
+        description="Install the bundled all-git plugin into ZCode user scope."
     )
     parser.add_argument(
         "--source",

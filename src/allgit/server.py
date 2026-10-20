@@ -101,7 +101,12 @@ class UpdateResult(BaseModel):
 
 
 def build_server(repo: Repository) -> MCPServer:
-    """Build the all-git MCP server with exactly four tools."""
+    """Build the all-git MCP server with exactly four tools.
+
+    The tools are plain functions on purpose: the MCP library runs those in a
+    worker thread, whereas an async tool runs on the event loop and a long
+    update_catalog would block pings until it finished.
+    """
     server = MCPServer(name="all-git", instructions=INSTRUCTIONS, version=VERSION)
 
     @server.tool(
@@ -113,7 +118,7 @@ def build_server(repo: Repository) -> MCPServer:
             "video evidence of why each is good."
         ),
     )
-    async def search_repos(
+    def search_repos(
         query: str,
         limit: int = Field(default=8, ge=1, le=MAX_SEARCH_RESULTS),
     ) -> SearchResult:
@@ -145,7 +150,7 @@ def build_server(repo: Repository) -> MCPServer:
             "timestamped link and caption excerpt."
         ),
     )
-    async def get_repo(owner: str, name: str) -> RepoDetail:
+    def get_repo(owner: str, name: str) -> RepoDetail:
         row = repo.get_repo(owner, name)
         if row is None:
             raise ValueError(f"Repository {owner}/{name} is not in the catalog.")
@@ -182,7 +187,7 @@ def build_server(repo: Repository) -> MCPServer:
             "videos, repos, mentions, and enrichment counts. Never contacts the network."
         ),
     )
-    async def get_catalog_status() -> StatusResult:
+    def get_catalog_status() -> StatusResult:
         counts = repo.counts()
         return StatusResult(version=VERSION, **counts)
 
@@ -196,7 +201,7 @@ def build_server(repo: Repository) -> MCPServer:
             "budget is spent. Report the returned counts to the user."
         ),
     )
-    async def update_catalog(
+    def update_catalog(
         fetch_captions: bool = True,
         enrich_meta: bool = True,
     ) -> UpdateResult:
