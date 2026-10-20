@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS repos (
     first_seen_video TEXT,
     last_seen_at TEXT,
     mention_count INTEGER NOT NULL DEFAULT 0,
+    source TEXT,
     UNIQUE (owner, name)
 );
 CREATE TABLE IF NOT EXISTS mentions (
@@ -88,6 +90,11 @@ def clean_tokens(query: str) -> list[str]:
     return [t for t in tokens if t.lower() not in {"the", "and", "for", "with", "that"}]
 
 
+# Where a repo was first seen. YouTube repos carry timestamped video mentions;
+# repos from other sources have GitHub metadata only.
+SOURCE_YOUTUBE = "youtube"
+SOURCE_X = "x"
+
 # Longest stretch of narration credited to a single repo mention.
 MENTION_WINDOW_MS = 120_000
 # Below this a caption chunk is awarded whole rather than split by time.
@@ -98,6 +105,7 @@ class Repository:
         self.db_path = db_path
         with self.transaction() as conn:
             conn.executescript(SCHEMA)
+            _migrate(conn)
 
     @contextmanager
     def transaction(self):
@@ -203,7 +211,16 @@ class Repository:
             )
 
     # -- repos and mentions --------------------------------------------
-    def upsert_repo(self, owner: str, name: str, url: str, display_name: str, video_id: str) -> int:
+    def upsert_repo(
+        self,
+        owner: str,
+        name: str,
+        url: str,
+        display_name: str,
+        video_id: str | None,
+        source: str = SOURCE_YOUTUBE,
+    ) -> int:
+        """Create or touch a repo; `source` records where it was first seen and is never overwritten."""
         with self.transaction() as conn:
             # GitHub names are case-insensitive; descriptions are not consistent.
             row = conn.execute(
@@ -214,9 +231,10 @@ class Repository:
             ).fetchone()
             if row is None:
                 conn.execute(
-                    """INSERT INTO repos (owner, name, url, display_names, first_seen_video, last_seen_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (owner, name, url, display_name, video_id, now_iso()),
+                    """INSERT INTO repos
+                       (owner, name, url, display_names, first_seen_video, last_seen_at, source)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (owner, name, url, display_name, video_id, now_iso(), source),
                 )
                 repo_id = int(
                     conn.execute(
@@ -414,7 +432,7 @@ class Repository:
             results = []
             for row in rows:
                 detail = conn.execute(
-                    """SELECT r.*, m.stars, m.language, m.archived, m.dead,
+                    """SELECT r.*, m.stars, m.language, m.archived, m.dead, m.gh_description,
                               (SELECT COUNT(*) FROM mentions x WHERE x.repo_id=r.repo_id) AS mentions
                        FROM repos r LEFT JOIN repo_meta m ON m.repo_id=r.repo_id
                        WHERE r.repo_id=?""",
@@ -475,6 +493,9 @@ class Repository:
                 ).fetchone()[0],
                 "repos": conn.execute("SELECT COUNT(*) FROM repos").fetchone()[0],
                 "mentions": conn.execute("SELECT COUNT(*) FROM mentions").fetchone()[0],
+                "video_backed": conn.execute(
+                    "SELECT COUNT(*) FROM repos WHERE mention_count > 0"
+                ).fetchone()[0],
                 "enriched": conn.execute(
                     "SELECT COUNT(*) FROM repo_meta WHERE fetched_at IS NOT NULL"
                 ).fetchone()[0],
@@ -482,6 +503,15 @@ class Repository:
                     "SELECT COUNT(*) FROM repo_meta WHERE dead=1"
                 ).fetchone()[0],
             }
+
+    def export(self, destination: Path) -> None:
+        """Write a compact, WAL-free copy of the catalog for bundling."""
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        staged = destination.with_name(destination.name + ".new")
+        staged.unlink(missing_ok=True)
+        with self.reading() as conn:
+            conn.execute("VACUUM INTO ?", (str(staged),))
+        os.replace(staged, destination)
 
     def repos_missing_meta(self, limit: int) -> list[dict[str, Any]]:
         """Repos never enriched, in random order.
@@ -523,6 +553,19 @@ class Repository:
                     now_iso(),
                 ),
             )
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring a catalog made by an older version up to the current schema."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(repos)")}
+    if "source" not in columns:
+        conn.execute("ALTER TABLE repos ADD COLUMN source TEXT")
+    # Every repo with a video mention came from the channel; older catalogs
+    # never recorded that, and the X-sourced rows injected into them had no
+    # mention to go by.
+    conn.execute(
+        "UPDATE repos SET source=? WHERE source IS NULL AND mention_count > 0", (SOURCE_YOUTUBE,)
+    )
 
 
 def _strip_git_suffixes(conn: sqlite3.Connection) -> None:

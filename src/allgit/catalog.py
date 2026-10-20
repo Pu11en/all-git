@@ -56,3 +56,27 @@ def _clean_name(name: str) -> str:
     if name.lower().endswith(".git") and len(name) > 4:
         name = name[:-4]
     return name
+
+
+REPO_URL = re.compile(r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?=[/?#\s\"'<>),.]|$)")
+_NOT_REPOS = {"orgs", "sponsors", "topics", "features", "marketplace", "settings", "apps", "login"}
+
+
+def parse_repo_urls(text: str) -> list[dict[str, str]]:
+    """Extract unique GitHub repos from free text such as a scraped post list.
+
+    Each entry has owner, name, and url. Order is first appearance; a repo is
+    reported once however many times, and in whatever letter case, it occurs.
+    """
+    repos: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for match in REPO_URL.finditer(text):
+        owner, name = match.group(1), _clean_name(match.group(2))
+        if not name or owner.lower() in _NOT_REPOS:
+            continue
+        key = f"{owner.lower()}/{name.lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        repos.append({"owner": owner, "name": name, "url": f"https://github.com/{owner}/{name}"})
+    return repos

@@ -59,3 +59,19 @@ def test_strips_git_clone_suffix():
     [mention] = parse_description("00:05 - Brain https://github.com/Lumen-Labs/brainapi2.git\n")
     assert mention["name"] == "brainapi2"
     assert mention["url"] == "https://github.com/Lumen-Labs/brainapi2"
+
+
+def test_parse_repo_urls_dedupes_and_cleans():
+    from allgit.catalog import parse_repo_urls
+
+    text = """Great finds this week:
+    https://github.com/immich-app/immich/ and https://github.com/Immich-App/Immich
+    git clone https://github.com/acme/tool.git
+    (see https://github.com/acme/tool/blob/main/README.md).
+    https://github.com/orgs/acme/projects/1
+    """
+    repos = parse_repo_urls(text)
+    assert [r["url"] for r in repos] == [
+        "https://github.com/immich-app/immich",
+        "https://github.com/acme/tool",
+    ]

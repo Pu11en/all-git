@@ -1,8 +1,9 @@
 # AGENT_INSTALL — all-git
 
 Read this completely before installing. all-git is a local stdio MCP server:
-a searchable SQLite catalog of every repository featured by the GitHub Awesome
-YouTube channel, shipped inside the package so a fresh install works with no
+a searchable SQLite catalog of curated GitHub repositories (every repository
+featured by the GitHub Awesome YouTube channel, plus repos collected from
+curated X posts), shipped inside the package so a fresh install works with no
 first-run ingestion. Four tools: `search_repos`, `get_repo`,
 `get_catalog_status`, `update_catalog`.
 
@@ -17,7 +18,7 @@ pinned release through `uvx`, which also provides `yt-dlp` for updates.
 ## Offline health check (run once before installing)
 
 ```bash
-uvx --from git+https://github.com/Pu11en/all-git@v0.1.3 all-git-mcp --check
+uvx --from git+https://github.com/Pu11en/all-git@v0.1.4 all-git-mcp --check
 ```
 
 Expect `{"status": "ok", ..., "tool_count": 4}`. The check copies the bundled
@@ -59,13 +60,13 @@ codex plugin add all-git
 ## Hermes Agent
 
 ```bash
-hermes mcp add all-git --command uvx --connect-timeout 60 --args --from git+https://github.com/Pu11en/all-git@v0.1.3 all-git-mcp
+hermes mcp add all-git --command uvx --connect-timeout 60 --args --from git+https://github.com/Pu11en/all-git@v0.1.4 all-git-mcp
 ```
 
 ## Same-session bridge (any client with frozen tools)
 
 ```text
-uvx --from git+https://github.com/Pu11en/all-git@v0.1.3 all-git <operation> [arguments]
+uvx --from git+https://github.com/Pu11en/all-git@v0.1.4 all-git <operation> [arguments]
 ```
 
 Operations mirror the four tools and emit identical structured JSON.

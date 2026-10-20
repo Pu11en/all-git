@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 APP_NAME = "allgit"
 CHANNEL_URL = "https://www.youtube.com/@GithubAwesome"
 DEFAULT_LANGUAGE = "en"
@@ -36,8 +36,8 @@ def bundled_catalog_path() -> Path | None:
     return path if path.exists() else None
 
 
-def _coverage(path: Path) -> tuple[int, int]:
-    """(videos, captioned videos) in a catalog; (0, 0) when unreadable."""
+def _coverage(path: Path) -> tuple[int, int, int]:
+    """(videos, captioned videos, repos) in a catalog; zeros when unreadable."""
     import sqlite3
 
     try:
@@ -45,11 +45,12 @@ def _coverage(path: Path) -> tuple[int, int]:
         try:
             videos = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
             captioned = conn.execute("SELECT COUNT(DISTINCT video_id) FROM chunks").fetchone()[0]
+            repos = conn.execute("SELECT COUNT(*) FROM repos").fetchone()[0]
         finally:
             conn.close()
     except sqlite3.Error:
-        return (0, 0)
-    return (videos, captioned)
+        return (0, 0, 0)
+    return (videos, captioned, repos)
 
 
 def catalog_path() -> Path:

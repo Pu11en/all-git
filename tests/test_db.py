@@ -176,3 +176,48 @@ def test_repair_merges_case_twins_and_git_suffix(tmp_path: Path) -> None:
     assert "Twin" in detail["display_names"]
     fixed = repo.get_repo("lab", "brain")
     assert fixed is not None and fixed["url"] == "https://github.com/lab/brain"
+
+
+def test_source_recorded_and_video_backed_counted(tmp_path: Path) -> None:
+    from allgit.db import SOURCE_X, SOURCE_YOUTUBE
+
+    repo = make_repo(tmp_path)
+    seed(repo)
+    repo.upsert_repo("acme", "scraped", "https://github.com/acme/scraped", "", None, source=SOURCE_X)
+    assert repo.get_repo("antonmedv", "gitmal")["source"] == SOURCE_YOUTUBE
+    assert repo.get_repo("acme", "scraped")["source"] == SOURCE_X
+    # Seeing an X repo on the channel later keeps its original source.
+    repo.upsert_repo("acme", "scraped", "https://github.com/acme/scraped", "Scraped", "fOU0lDCeNwo")
+    assert repo.get_repo("acme", "scraped")["source"] == SOURCE_X
+    counts = repo.counts()
+    assert counts["repos"] == 3
+    assert counts["video_backed"] == 2
+
+
+def test_migration_adds_source_to_old_catalog(tmp_path: Path) -> None:
+    import sqlite3
+
+    from allgit.db import SOURCE_YOUTUBE
+
+    path = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """CREATE TABLE repos (repo_id INTEGER PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL,
+             url TEXT NOT NULL, display_names TEXT NOT NULL DEFAULT '', first_seen_video TEXT,
+             last_seen_at TEXT, mention_count INTEGER NOT NULL DEFAULT 0, UNIQUE (owner, name));
+           INSERT INTO repos (owner, name, url, mention_count) VALUES ('a', 'seen', 'u', 2), ('b', 'orphan', 'u', 0);"""
+    )
+    conn.commit()
+    conn.close()
+    repo = Repository(path)
+    assert repo.get_repo("a", "seen")["source"] == SOURCE_YOUTUBE
+    assert repo.get_repo("b", "orphan")["source"] is None
+
+
+def test_export_writes_compact_copy(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    seed(repo)
+    out = tmp_path / "bundle" / "catalog.sqlite3"
+    repo.export(out)
+    assert Repository(out).counts() == repo.counts()
+    assert not (tmp_path / "bundle" / "catalog.sqlite3.new").exists()
